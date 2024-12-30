@@ -5,8 +5,6 @@ defmodule RtmpToHlsPipeline do
 
   @impl true
   def handle_init(_context, client_ref: client_ref, stream_key: stream_key) do
-    SourceRegistry.register(stream_key)
-
     structure = [
       child(:src, %SourceBin{client_ref: client_ref})
       |> via_out(:audio)
@@ -42,6 +40,18 @@ defmodule RtmpToHlsPipeline do
   end
 
   @impl true
+  def handle_child_notification({:track_playable, :video}, _element, _context, state) do
+    SourceRegistry.register(state[:stream_key])
+    {[], state}
+  end
+
+  @impl true
+  def handle_child_notification(:end_of_stream, _element, _context, state) do
+    SourceRegistry.deregister(state[:stream_key])
+    {[], state}
+  end
+
+  @impl true
   def handle_child_notification(_notification, _child, _ctx, state) do
     {[], state}
   end
@@ -57,11 +67,5 @@ defmodule RtmpToHlsPipeline do
     end
 
     {[], state}
-  end
-
-  def handle_terminate_request(_context, state) do
-    SourceRegistry.deregister(state[:stream_key])
-
-    {[terminate: :normal], state}
   end
 end
